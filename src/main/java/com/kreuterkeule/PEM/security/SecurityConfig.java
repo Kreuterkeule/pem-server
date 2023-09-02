@@ -40,7 +40,14 @@ public class SecurityConfig {
                 .and()
                 .authorizeRequests()
                 //.requestMatchers(HttpMethod.GET).authenticated()
-                .requestMatchers("/api/auth/register", "/api/auth/login", "/api/auth/logout", "/login", "/error", "/getToken").permitAll()
+                .requestMatchers("/api/auth/register",
+                        "/api/auth/login",
+                        "/api/auth/logout",
+                        "/login",
+                        "/error",
+                        "/getToken",
+                        "/api/auth/registerAdmin"
+                ).permitAll()
                 .anyRequest().authenticated()
                 .and()
                 .httpBasic()

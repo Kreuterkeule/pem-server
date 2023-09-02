@@ -12,6 +12,7 @@ import com.kreuterkeule.PEM.services.UniqueTokenProviderService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -22,6 +23,7 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -69,10 +71,61 @@ public class AuthController {
         return new ResponseEntity<>(new AuthResponseDto(""), HttpStatus.OK);
     }
 
+    private void saveNewAdmin(String username, String password) {
+        UserEntity user = new UserEntity();
+        user.setUsername(username);
+        user.setPassword(passwordEncoder.encode(password));
+        RoleEntity role = roleRepository.findByName("ADMIN").get();
+        user.setRoles(Collections.singletonList(role));
+        user.setIdentifierToken(uniqueTokenProviderService.generateToken());
+        userRepository.save(user);
+    }
+
+    @PostMapping("registerAdmin")
+    public ResponseEntity<String> registerAdmin(@RequestBody RegisterDto registerDto, HttpServletRequest request) {
+        if (userRepository.findByUsername(registerDto.getUsername()).orElse(null) != null) {
+            return new ResponseEntity<>("Username taken", HttpStatus.BAD_REQUEST);
+        }
+        if (userRepository.findAll().isEmpty()) {
+            this.saveNewAdmin(registerDto.getUsername(), registerDto.getPassword());
+            return new ResponseEntity<>("First admin created successfully!!!", HttpStatus.OK);
+        }
+        if (userRepository.findAll().stream().allMatch(e -> e.getRoles().stream().allMatch(f -> !f.getName().equals("ADMIN")))) {
+            this.saveNewAdmin(registerDto.getUsername(), registerDto.getPassword());
+            return new ResponseEntity<>("First admin created successfully!!!", HttpStatus.OK);
+        }
+        final String header = request.getHeader("Authorization");
+        if (header == null || header == "") {
+            return new ResponseEntity<>("Your authorization header is empty", HttpStatus.UNAUTHORIZED);
+        }
+        String jwtToken = header.substring(7);
+        UserEntity client = userRepository.findByUsername(jwtUtils.getUsernameFromJwt(jwtToken)).get();
+        if (client.getRoles().stream().anyMatch(e -> e.getName().equals("ADMIN"))) {
+            this.saveNewAdmin(registerDto.getUsername(), registerDto.getPassword());
+            return new ResponseEntity<>("an admin created successfully!!!", HttpStatus.OK);
+        }
+        return new ResponseEntity<>("You are not permitted to create an ADMIN", HttpStatus.UNAUTHORIZED);
+    }
+
     @PostMapping("register")
-    public ResponseEntity<String> register(@RequestBody RegisterDto registerDto) {
+    public ResponseEntity<String> register(@RequestBody RegisterDto registerDto, HttpServletRequest request) {
         if (userRepository.existsByUsername(registerDto.getUsername())) {
             return new ResponseEntity<>("Username already taken!", HttpStatus.BAD_REQUEST);
+        }
+        if (request.getHeader("Authorization") == null ){
+            return new ResponseEntity<>("You are not Authorized", HttpStatus.UNAUTHORIZED);
+        }
+        String authorizationHeader = request.getHeader("Authorization");
+        if (authorizationHeader == "") {
+            return new ResponseEntity<>("You are not Authorized, your header is empty", HttpStatus.UNAUTHORIZED);
+        }
+        String token = authorizationHeader.substring(7);
+        UserEntity client = userRepository.findByUsername(jwtUtils.getUsernameFromJwt(token)).get();
+        if (client == null) {
+            return new ResponseEntity<>("You are not logged in correctly!", HttpStatus.FORBIDDEN);
+        }
+        if (!client.getRoles().contains(roleRepository.findByName("ADMIN").get())) {
+            return new ResponseEntity<>("You are not an Admin", HttpStatus.UNAUTHORIZED);
         }
 
         UserEntity user = new UserEntity();
@@ -120,5 +173,8 @@ public class AuthController {
                 ).get(),
                 HttpStatus.OK);
     }
-
+    @GetMapping("getUsers")
+    public ResponseEntity<List<UserEntity>> getUsers() {
+        return new ResponseEntity<List<UserEntity>>((List<UserEntity>) userRepository.findAll().stream().map(e -> {e.setPassword("****") /* hide password hashes from other users */; return e;}).collect(Collectors.toList()), (HttpStatusCode) HttpStatus.OK);
+    }
 }

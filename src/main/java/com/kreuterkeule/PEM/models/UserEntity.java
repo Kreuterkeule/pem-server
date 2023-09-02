@@ -27,11 +27,5 @@ public class UserEntity {
         inverseJoinColumns = @JoinColumn(name = "role_id", referencedColumnName = "id")
     )
     private List<RoleEntity> roles = new ArrayList<>();
-    @ElementCollection
-    Map<String, String> contacts;
-
-    public void addToContacts(String token,String nickname) {
-        this.contacts.put(token, nickname);
-    }
 
 }
