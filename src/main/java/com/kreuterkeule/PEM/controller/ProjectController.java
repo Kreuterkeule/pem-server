@@ -5,7 +5,6 @@ import com.kreuterkeule.PEM.models.ProjectEntity;
 import com.kreuterkeule.PEM.models.UserEntity;
 import com.kreuterkeule.PEM.repositories.ProjectRepository;
 import com.kreuterkeule.PEM.repositories.UserRepository;
-import com.kreuterkeule.PEM.security.JwtUtils;
 import com.kreuterkeule.PEM.services.IdGeneratorService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -20,23 +19,23 @@ import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 
 @Controller
 @RequestMapping("api/project")
 public class ProjectController {
 
-    @Autowired
-    private UserRepository userRepository;
+    private final UserRepository userRepository;
+
+    private final ProjectRepository projectRepository;
+
+    private final IdGeneratorService idGen;
 
     @Autowired
-    private ProjectRepository projectRepository;
-
-    @Autowired
-    private IdGeneratorService idGen;
-
-    @Autowired
-    private JwtUtils jwtUtils;
+    public ProjectController(IdGeneratorService idGen, ProjectRepository projectRepository, UserRepository userRepository) {
+        this.userRepository = userRepository;
+        this.projectRepository = projectRepository;
+        this.idGen = idGen;
+    }
 
     @PostMapping("/create")
     public ResponseEntity<ProjectEntity> create(@RequestBody CreatePDto createPDto) {

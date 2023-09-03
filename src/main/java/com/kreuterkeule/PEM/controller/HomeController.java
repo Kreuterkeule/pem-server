@@ -14,15 +14,15 @@ import org.springframework.web.bind.annotation.RestController;
 
 public class HomeController {
 
-    private JwtUtils jwtUtils;
+    private final JwtUtils jwtUtils;
+
+    private final UniqueTokenProviderService uniqueTokenProviderService;
 
     @Autowired
-    public HomeController(JwtUtils jwtUtils) {
+    public HomeController(JwtUtils jwtUtils, UniqueTokenProviderService uniqueTokenProviderService) {
         this.jwtUtils = jwtUtils;
+        this.uniqueTokenProviderService = uniqueTokenProviderService;
     }
-
-    @Autowired
-    UniqueTokenProviderService uniqueTokenProviderService;
 
     @GetMapping("/getToken")
     public String getToken() {

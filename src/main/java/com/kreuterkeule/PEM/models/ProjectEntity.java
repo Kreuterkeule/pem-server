@@ -11,7 +11,6 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 @Entity
 @Getter
@@ -47,7 +46,7 @@ public class ProjectEntity {
     )
     private Set<UserEntity> responsible;
 
-    public List<String> getResponsibleNames() {
+    public List<String> getResponsibleNames() { // this function actually is used, when converted to JSON, DO NOT REMOVE
         List<String> names = new ArrayList<>();
         this.responsible.forEach(e -> names.add(e.getUsername()));
         return names;

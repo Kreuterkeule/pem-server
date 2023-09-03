@@ -9,8 +9,12 @@ import java.util.Random;
 @Service
 public class UniqueTokenProviderService {
 
+    private final UserRepository userRepository;
+
     @Autowired
-    private UserRepository userRepository;
+    public UniqueTokenProviderService(UserRepository userRepository) {
+        this.userRepository = userRepository;
+    }
 
     public String generateToken() {
         int leftLimit = 48; // numeral '0'
@@ -27,10 +31,10 @@ public class UniqueTokenProviderService {
         System.out.println(generatedString);
 
         for (int i = 0; i < 3; i++) {
-            generatedString = generatedString.substring(0, (i + 1) * 6) + '-' + generatedString.substring(((i+1) * 6) + 1, generatedString.length());
+            generatedString = generatedString.substring(0, (i + 1) * 6) + '-' + generatedString.substring(((i+1) * 6) + 1);
         }
         String firstChar = generatedString.substring(0, 1);
-        generatedString = generatedString.substring(1, generatedString.length()) + firstChar;
+        generatedString = generatedString.substring(1) + firstChar;
 
         if(userRepository.findByIdentifierToken(generatedString).isEmpty()) {
             return generatedString;

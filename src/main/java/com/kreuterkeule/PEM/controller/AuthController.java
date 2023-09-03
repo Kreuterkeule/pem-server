@@ -12,14 +12,12 @@ import com.kreuterkeule.PEM.services.UniqueTokenProviderService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.*;
@@ -30,17 +28,17 @@ import java.util.stream.Collectors;
 @CrossOrigin
 public class AuthController {
 
-    private AuthenticationManager authenticationManager;
+    private final AuthenticationManager authenticationManager;
 
-    private UserRepository userRepository;
+    private final UserRepository userRepository;
 
-    private RoleRepository roleRepository;
+    private final RoleRepository roleRepository;
 
-    private PasswordEncoder passwordEncoder;
+    private final PasswordEncoder passwordEncoder;
 
-    private JwtUtils jwtUtils;
+    private final JwtUtils jwtUtils;
 
-    private UniqueTokenProviderService uniqueTokenProviderService;
+    private final UniqueTokenProviderService uniqueTokenProviderService;
 
     @Autowired
     public AuthController(AuthenticationManager authenticationManager, UserRepository userRepository, RoleRepository roleRepository, PasswordEncoder passwordEncoder, JwtUtils jwtUtils, UniqueTokenProviderService uniqueTokenProviderService) {
@@ -65,24 +63,21 @@ public class AuthController {
         return new ResponseEntity<>(new AuthResponseDto(token), HttpStatus.OK);
     }
 
-    @PostMapping("logout")
-    public ResponseEntity<AuthResponseDto> logout(HttpServletRequest request) {
-
-        return new ResponseEntity<>(new AuthResponseDto(""), HttpStatus.OK);
-    }
-
-    private void saveNewAdmin(String username, String password) {
+    private void saveNewAdmin(String username, String password) throws Exception {
         UserEntity user = new UserEntity();
         user.setUsername(username);
         user.setPassword(passwordEncoder.encode(password));
-        RoleEntity role = roleRepository.findByName("ADMIN").get();
+        RoleEntity role = roleRepository.findByName("ADMIN").orElse(null);
+        if (role == null) {
+            throw new Exception("Please initialize the role table in the database with 0, ADMIN | 1, USER");
+        }
         user.setRoles(Collections.singletonList(role));
         user.setIdentifierToken(uniqueTokenProviderService.generateToken());
         userRepository.save(user);
     }
 
     @PostMapping("registerAdmin")
-    public ResponseEntity<String> registerAdmin(@RequestBody RegisterDto registerDto, HttpServletRequest request) {
+    public ResponseEntity<String> registerAdmin(@RequestBody RegisterDto registerDto, HttpServletRequest request) throws Exception {
         if (userRepository.findByUsername(registerDto.getUsername()).orElse(null) != null) {
             return new ResponseEntity<>("Username taken", HttpStatus.BAD_REQUEST);
         }
@@ -90,16 +85,19 @@ public class AuthController {
             this.saveNewAdmin(registerDto.getUsername(), registerDto.getPassword());
             return new ResponseEntity<>("First admin created successfully!!!", HttpStatus.OK);
         }
-        if (userRepository.findAll().stream().allMatch(e -> e.getRoles().stream().allMatch(f -> !f.getName().equals("ADMIN")))) {
+        if (userRepository.findAll().stream().allMatch(e -> e.getRoles().stream().noneMatch(f -> f.getName().equals("ADMIN")))) {
             this.saveNewAdmin(registerDto.getUsername(), registerDto.getPassword());
             return new ResponseEntity<>("First admin created successfully!!!", HttpStatus.OK);
         }
         final String header = request.getHeader("Authorization");
-        if (header == null || header == "") {
+        if (header == null || header.equals("")) {
             return new ResponseEntity<>("Your authorization header is empty", HttpStatus.UNAUTHORIZED);
         }
         String jwtToken = header.substring(7);
-        UserEntity client = userRepository.findByUsername(jwtUtils.getUsernameFromJwt(jwtToken)).get();
+        UserEntity client = userRepository.findByUsername(jwtUtils.getUsernameFromJwt(jwtToken)).orElse(null);
+        if (client == null) {
+            return new ResponseEntity<>("You are not logged in", HttpStatus.UNAUTHORIZED);
+        }
         if (client.getRoles().stream().anyMatch(e -> e.getName().equals("ADMIN"))) {
             this.saveNewAdmin(registerDto.getUsername(), registerDto.getPassword());
             return new ResponseEntity<>("an admin created successfully!!!", HttpStatus.OK);
@@ -108,7 +106,7 @@ public class AuthController {
     }
 
     @PostMapping("register")
-    public ResponseEntity<String> register(@RequestBody RegisterDto registerDto, HttpServletRequest request) {
+    public ResponseEntity<String> register(@RequestBody RegisterDto registerDto, HttpServletRequest request) throws Exception {
         if (userRepository.existsByUsername(registerDto.getUsername())) {
             return new ResponseEntity<>("Username already taken!", HttpStatus.BAD_REQUEST);
         }
@@ -116,15 +114,15 @@ public class AuthController {
             return new ResponseEntity<>("You are not Authorized", HttpStatus.UNAUTHORIZED);
         }
         String authorizationHeader = request.getHeader("Authorization");
-        if (authorizationHeader == "") {
+        if (authorizationHeader.equals("")) {
             return new ResponseEntity<>("You are not Authorized, your header is empty", HttpStatus.UNAUTHORIZED);
         }
         String token = authorizationHeader.substring(7);
-        UserEntity client = userRepository.findByUsername(jwtUtils.getUsernameFromJwt(token)).get();
+        UserEntity client = userRepository.findByUsername(jwtUtils.getUsernameFromJwt(token)).orElse(null);
         if (client == null) {
             return new ResponseEntity<>("You are not logged in correctly!", HttpStatus.FORBIDDEN);
         }
-        if (!client.getRoles().contains(roleRepository.findByName("ADMIN").get())) {
+        if (!client.getRoles().contains(roleRepository.findByName("ADMIN").orElse(null))) {
             return new ResponseEntity<>("You are not an Admin", HttpStatus.UNAUTHORIZED);
         }
 
@@ -133,7 +131,10 @@ public class AuthController {
         user.setPassword(passwordEncoder.encode(registerDto.getPassword()));
         user.setIdentifierToken(uniqueTokenProviderService.generateToken()); // TODO: make unique token really unique
 
-        RoleEntity roles = roleRepository.findByName("USER").get();
+        RoleEntity roles = roleRepository.findByName("USER").orElse(null);
+        if (roles == null) {
+            throw new Exception("Please initialize the Database with: 0, ADMIN | 1, USER");
+        }
         user.setRoles(Collections.singletonList(roles));
 
         userRepository.save(user);
@@ -142,10 +143,16 @@ public class AuthController {
     }
 
     @GetMapping("delete")
-    public ResponseEntity<UserEntity> delete(@RequestParam("id") int id, HttpServletRequest request, Model model) {
+    public ResponseEntity<UserEntity> delete(@RequestParam("id") int id, HttpServletRequest request) {
 
         String token = request.getHeader("Authorization").substring(7);
-        UserEntity user = userRepository.findByUsername(jwtUtils.getUsernameFromJwt(token)).get();
+        UserEntity user = userRepository.findByUsername(jwtUtils.getUsernameFromJwt(token)).orElse(null);
+        if (user == null) {
+            UserEntity $ = new UserEntity();
+            $.setRoles(new ArrayList<>());
+            $.setProjects(new ArrayList<>());
+            return new ResponseEntity<>(new UserEntity(), HttpStatus.UNAUTHORIZED);
+        }
         if (user.getId() == id) {
             user.setRoles(new ArrayList<>());
             userRepository.deleteById(id);
@@ -170,11 +177,12 @@ public class AuthController {
                                         7
                                 )
                         )
-                ).get(),
+                ).orElse(null),
                 HttpStatus.OK);
     }
     @GetMapping("getUsers")
     public ResponseEntity<List<UserEntity>> getUsers() {
-        return new ResponseEntity<List<UserEntity>>((List<UserEntity>) userRepository.findAll().stream().map(e -> {e.setPassword("****") /* hide password hashes from other users */; return e;}).collect(Collectors.toList()), (HttpStatusCode) HttpStatus.OK);
+        return new ResponseEntity<>( userRepository.findAll().stream().peek(e -> {e.setPassword("****") /* hide password hashes from other users */;
+        }).collect(Collectors.toList()), HttpStatus.OK);
     }
 }

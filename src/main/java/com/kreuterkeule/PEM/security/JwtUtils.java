@@ -17,7 +17,7 @@ import java.util.Map;
 @Component
 public class JwtUtils {
 
-    private HttpRequestService httpRequestService;
+    private final HttpRequestService httpRequestService;
 
     @Autowired
     public JwtUtils(HttpRequestService httpRequestService) {
@@ -33,7 +33,7 @@ public class JwtUtils {
 
         claims.put("ip", httpRequestService.getIpFromRequest(request));
 
-        String token = Jwts.builder()
+        return Jwts.builder()
                 .addClaims(claims)
                 .setSubject(username)
                 .setIssuedAt(currentDate)
@@ -41,12 +41,6 @@ public class JwtUtils {
                 .signWith(SignatureAlgorithm.HS512, SecurityConstants.JWT_SECRET)
                 .compact();
 
-        return token;
-
-    }
-
-    public String stripToken(String token) {
-        return token.substring(7, token.length());
     }
 
     public String getUsernameFromJwt(String token) {
@@ -69,7 +63,7 @@ public class JwtUtils {
     public String getJWTFromRequest(HttpServletRequest request) {
         String bearerToken = request.getHeader("Authorization");
         if (StringUtils.hasText(bearerToken) && bearerToken.startsWith("Bearer ")) {
-            return bearerToken.substring(7, bearerToken.length());
+            return bearerToken.substring(7);
         }
         return null;
     }
