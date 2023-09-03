@@ -80,6 +80,13 @@ public class ProjectController {
             $.setResponsible(new HashSet<>());
             return new ResponseEntity<>($, HttpStatus.UNAUTHORIZED);
         }
-        return new ResponseEntity<>(projectRepository.deleteById(id), HttpStatus.OK);
+        ProjectEntity project = projectRepository.findById(id).orElse(null);
+        if (project == null) {
+            ProjectEntity $ = new ProjectEntity();
+            $.setResponsible(new HashSet<>());
+            return new ResponseEntity<>($, HttpStatus.BAD_REQUEST);
+        }
+        projectRepository.deleteById(id);
+        return new ResponseEntity<>(project, HttpStatus.OK);
     }
 }
