@@ -18,4 +18,7 @@ public interface UserRepository extends JpaRepository<UserEntity, Integer> {
     @Query("SELECT u FROM UserEntity u where u.identifierToken = :token ")
     Optional<UserEntity> findByIdentifierToken(String token);
 
+    @Query("SELECT user FROM UserEntity user WHERE user.username IN :usernames")
+    List<UserEntity> findUsersByUsernames(List<String> usernames);
+
 }

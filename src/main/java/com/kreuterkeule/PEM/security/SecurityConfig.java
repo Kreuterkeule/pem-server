@@ -46,7 +46,9 @@ public class SecurityConfig {
                         "/login",
                         "/error",
                         "/getToken",
-                        "/api/auth/registerAdmin"
+                        "/api/auth/registerAdmin",
+                        "/api/project/create",
+                        "/api/project/getAll"
                 ).permitAll()
                 .anyRequest().authenticated()
                 .and()
